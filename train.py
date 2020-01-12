@@ -1,8 +1,26 @@
 from model import SkipConnBiLSTM
 import preprocess
+import torch.nn as nn
+# data:
+#     snli:
+#         train: tensor
+#         dev: tensor
+#         test: tensor
+#     multinli:
+#         train: tensor
+#         dev_matched: tensor
+#         dev_mismatched: tensor
+# tensor_dim -> (num_examples, len_seq)
 
 def train(embds, data, word_to_ix, label_to_ix, **kwargs):
     print(kwargs)
+    batch_size = kwargs['batch_size']
+    epochs = kwargs['epochs']
+    ignore_index = label_to_ix[preprocess.pad_string]
+    loss_function = nn.NLLLoss(ignore_index=ignore_index)
+    idx_rand = torch.rand
+    for epoch in range(epochs):
+
 
     # Initialize linear layers
     # ignore_index = label_to_ix[preprocess.pad_string]
