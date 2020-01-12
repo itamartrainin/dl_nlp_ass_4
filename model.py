@@ -7,6 +7,10 @@ class SkipConnBiLSTM(nn.Module):
     def __init__(self, embds_weights, dicts, h, lin_h, **kwargs):
         super(SkipConnBiLSTM, self).__init__()
 
+        # Variable initializations
+        h if type(h) == list else list(h)
+        lin_h if type(lin_h) == list else list(lin_h)
+
         self.num_encoding_layers = len(h)
         self.num_lin_layers = len(lin_h)
 
@@ -19,28 +23,37 @@ class SkipConnBiLSTM(nn.Module):
         self.shortcuts = kwargs['shortcuts']
 
         self.word_to_ix, self.label_to_ix = dicts
+        self.embd_dim = embds_weights.size(1)
 
+        # Initialize embedding layer
         self.E = nn.Embedding.from_pretrained(embds_weights, freeze=self.fine_tune)
+
+        # Initialize encoder layers
         self.bilstms = []
         for i in range(self.num_encoding_layers):
-            self.bilstms.append(nn.LSTM(len(self.word_to_ix) + 2 * sum(h[:i]),
-                                        h[i],
-                                        dropout=self.dropout,
-                                        bidirectional=True,
-                                        batch_first=True))
+            if self.shortcuts == 'all':
+                self.bilstms.append(nn.LSTM(self.embd_dim + 2 * sum(h[:i]),
+                                            h[i],
+                                            dropout=self.dropout,
+                                            bidirectional=True,
+                                            batch_first=True))
+            elif self.shortcuts == 'word':
+                self.bilstms.append(nn.LSTM(self.embd_dim + (i != 0) * h[i-1],
+                                            h[i],
+                                            dropout=self.dropout,
+                                            bidirectional=True,
+                                            batch_first=True))
+            else:
+                self.bilstms.append(nn.LSTM((i == 0) * self.embd_dim + (i != 0) * h[i-1],
+                                            h[i],
+                                            dropout=self.dropout,
+                                            bidirectional=True,
+                                            batch_first=True))
 
+        # Initialize linear layers
         self.linears = []
         for i in range(self.num_lin_layers):
-            if i == 0:
-                self.linears.append(nn.Linear(h[-1], lin_h[i]))
-            else:
-                self.linears.append(nn.Linear(lin_h[i-1], lin_h[i]))
-
-        self.loss_function = nn.NLLLoss(ignore_index=self.ignore_index)
-
-        # Needs to be in train and lr should be dynamic
-        self.lr = kwargs['lr'] if 'lr' in kwargs else 0.0002
-        self.optimizer = optim.SGD(self.parameters(), lr=self.lr)
+            self.linears.append(nn.Linear((i == 0) * 2 * h[-1] + (i != 0) * lin_h[i-1], lin_h[i]))
 
     def forward(self, s1, s2, lens1, lens2):
         # Embedding layer
@@ -56,7 +69,7 @@ class SkipConnBiLSTM(nn.Module):
         s2, _ = torch.max(s2, dim=1)
 
         # Entaliment Layer
-        cat_vec = torch.cat((s1,s2), dim=1)
+        cat_vec = torch.cat((s1, s2), dim=1)
         dis_vec = torch.abs(s1 - s2)
         prod_vec = s1 * s2
         m = torch.cat((cat_vec, dis_vec, prod_vec), dim=1)
@@ -67,26 +80,26 @@ class SkipConnBiLSTM(nn.Module):
         return output
 
     def encode(self, s, lens):
-        # Do we need to initialize h_0, c_0 before the second encode?
+
+        batch_size = s.size(0)
+        absolute_max_seq_len = s.size(1)
+
+        s = s[:, :max(lens)]
         words = s
         for one_layer in self.bilstms:
             packed = nn.utils.rnn.pack_padded_sequence(s, lens.cpu().numpy(), enforce_sorted=False, batch_first=True)
             out, _ = one_layer(packed)
             unpacked, _ = nn.utils.rnn.pad_packed_sequence(out)
-            padded_unpacked = self.repad(unpacked, s.size(0), s.size(1), 2 * s.size(2))
-            if self.shortcuts == 'all':
-                s = torch.cat((s, padded_unpacked), dim=2)
-            elif self.shortcuts == 'word':
-                s = torch.cat((words, padded_unpacked), dim=2)
-            # else (self.shortcuts == 'none') then apply no concatenation
-        return padded_unpacked
 
-    def repad(self, x, *org_sizes):
-        padded = torch.zeros(org_sizes[0], org_sizes[1], org_sizes[2])
-        padded = padded.transpose(0, 1)
-        x = x.transpose(0, 1)
-        padded[:x.size(0)] = x
-        padded = padded.transpose(0, 1)
+            if self.shortcuts == 'all':
+                s = torch.cat((s, unpacked), dim=2)
+            elif self.shortcuts == 'word':
+                s = torch.cat((words, unpacked), dim=2)
+            # else (self.shortcuts == 'none') then apply no concatenation
+
+        padded = torch.zeros(batch_size, absolute_max_seq_len, s.size(2))
+        padded[:, :s.size(1)] = s
+
         return padded
 
     def mlp(self, m):
@@ -99,4 +112,5 @@ class SkipConnBiLSTM(nn.Module):
             else:
                 raise Exception('invalid activation function. Use "tanh" or "relu"')
             m = one_layer(m)
+
         return m

@@ -1,8 +1,17 @@
 from model import SkipConnBiLSTM
 import preprocess
 
-def train(**kwargs):
+def train(embds, data, word_to_ix, label_to_ix, **kwargs):
     print(kwargs)
+
+    # Initialize linear layers
+    # ignore_index = label_to_ix[preprocess.pad_string]
+    # loss_function = nn.NLLLoss(ignore_index=ignore_index)
+
+    # Needs to be in train and lr should be dynamic
+    # lr = kwargs['lr']
+    # optimizer = optim.Adam(self.parameters(), lr=self.lr) ???how to used adam???
+
     return
 
 
@@ -31,6 +40,6 @@ if __name__ == '__main__':
     embds, data, word_to_ix, label_to_ix = preprocess.get_preprocessed_data(args['embds_fname'], args['data_fname'],
                                                                             args['preprocess'], args['preprocess'])
 
-    train(**args)
+    train(embds, data, word_to_ix, label_to_ix, **args)
 
     print(args)
