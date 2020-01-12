@@ -46,6 +46,7 @@ for fname in fnames:
     print('\'' + fname + '\'')
     print('true_line_counter: ' + str(true_line_counter))
     print('false_line_counter: ' + str(false_line_counter))
+    print('total_line_counter: ' + str(true_line_counter + false_line_counter))
     print('LHS_max_len: ' + str(LHS_max_len))
     print('LHS_ave_len: ' + str(LHS_ave_len / true_line_counter))
     print('RHS_max_len: ' + str(RHS_max_len))
@@ -59,6 +60,7 @@ print('RHS_total_max_len: ' + str(RHS_total_max_len))
 # '../data/snli_1.0/snli_1.0/snli_1.0_train.jsonl'
 # true_line_counter: 549367
 # false_line_counter: 785
+# total_line_counter: 550152
 # LHS_max_len: 82
 # LHS_ave_len: 14.029819774394895
 # RHS_max_len: 62
@@ -67,6 +69,7 @@ print('RHS_total_max_len: ' + str(RHS_total_max_len))
 # '../data/snli_1.0/snli_1.0/snli_1.0_dev.jsonl'
 # true_line_counter: 9842
 # false_line_counter: 158
+# total_line_counter: 10000
 # LHS_max_len: 59
 # LHS_ave_len: 15.18644584434058
 # RHS_max_len: 55
@@ -75,6 +78,7 @@ print('RHS_total_max_len: ' + str(RHS_total_max_len))
 # '../data/snli_1.0/snli_1.0/snli_1.0_test.jsonl'
 # true_line_counter: 9824
 # false_line_counter: 176
+# total_line_counter: 10000
 # LHS_max_len: 57
 # LHS_ave_len: 15.155028501628664
 # RHS_max_len: 30
@@ -83,6 +87,7 @@ print('RHS_total_max_len: ' + str(RHS_total_max_len))
 # '../data/multinli_1.0/multinli_1.0/multinli_1.0_train.jsonl'
 # true_line_counter: 392702
 # false_line_counter: 0
+# total_line_counter: 392702
 # LHS_max_len: 401
 # LHS_ave_len: 22.281898233265938
 # RHS_max_len: 70
@@ -91,6 +96,7 @@ print('RHS_total_max_len: ' + str(RHS_total_max_len))
 # '../data/multinli_1.0/multinli_1.0/multinli_1.0_dev_matched.jsonl'
 # true_line_counter: 9815
 # false_line_counter: 185
+# total_line_counter: 10000
 # LHS_max_len: 205
 # LHS_ave_len: 21.68762098828324
 # RHS_max_len: 51
@@ -99,6 +105,7 @@ print('RHS_total_max_len: ' + str(RHS_total_max_len))
 # '../data/multinli_1.0/multinli_1.0/multinli_1.0_dev_mismatched.jsonl'
 # true_line_counter: 9832
 # false_line_counter: 168
+# total_line_counter: 10000
 # LHS_max_len: 146
 # LHS_ave_len: 22.552583401139138
 # RHS_max_len: 65
