@@ -103,7 +103,7 @@ class SkipConnBiLSTM(nn.Module):
         return padded
 
     def mlp(self, m):
-        # Activation after encoding and after each linear other than last one.
+            # Activation after encoding and after each linear other than last one.
         for one_layer in self.linears:
             if self.activation == 'tanh':
                 m = F.tanh(m)

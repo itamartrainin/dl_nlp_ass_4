@@ -135,7 +135,7 @@ def read_data(props, word_to_ix, label_to_ix):
 
                 i += 1
 
-        ret[ds_type] = (LHS_word_ixs, RHS_word_ixs, LHS_lens, RHS_lens)
+        ret[ds_type] = (LHS_word_ixs, RHS_word_ixs, LHS_lens, RHS_lens, labels)
 
     return ret
 
@@ -155,4 +155,4 @@ def token_ixs_in_sentence(sentence, word_to_ix):
 if __name__ == '__main__':
     preprocessed_data_fname = '../data/preprocessed_data'
     embds_fname = '../data/embds'
-    get_preprocessed_data(embds_fname, preprocessed_data_fname, True, True)
+    get_preprocessed_data(embds_fname, preprocessed_data_fname, True, False)
