@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
-import numpy as np
 
 class SkipConnBiLSTM(nn.Module):
     def __init__(self, embds_weights, dicts, h, lin_h, **kwargs):
@@ -12,11 +10,13 @@ class SkipConnBiLSTM(nn.Module):
         self.num_encoding_layers = len(h)
         self.num_lin_layers = len(lin_h)
 
-        self.LHS_max_len = kwargs['LHS_max_len'] if 'LHS_max_len' in kwargs else 401
-        self.RHS_max_len = kwargs['RHS_max_len'] if 'RHS_max_len' in kwargs else 70
-        self.fine_tune = kwargs['fine_tune'] if 'fine_tune' in kwargs else True
-        self.dropout = kwargs['dropout'] if 'dropout' in kwargs else 0.1
-        self.ignore_index = kwargs['ignore_index'] if 'ignore_index' in kwargs else 0
+        self.LHS_max_len = kwargs['LHS_max_len']
+        self.RHS_max_len = kwargs['RHS_max_len']
+        self.fine_tune = kwargs['fine_tune']
+        self.dropout = kwargs['dropout']
+        self.ignore_index = kwargs['ignore_index']
+        self.activation = kwargs['activation']
+        self.shortcuts = kwargs['shortcuts']
 
         self.word_to_ix, self.label_to_ix = dicts
 
@@ -62,16 +62,23 @@ class SkipConnBiLSTM(nn.Module):
         m = torch.cat((cat_vec, dis_vec, prod_vec), dim=1)
 
         # MLP layer
-        m = self.mlp(m)
+        output = self.mlp(m)
+
+        return output
 
     def encode(self, s, lens):
-        # Do we need to initialize h_0, c_0 before the seconde encode?
+        # Do we need to initialize h_0, c_0 before the second encode?
+        words = s
         for one_layer in self.bilstms:
             packed = nn.utils.rnn.pack_padded_sequence(s, lens.cpu().numpy(), enforce_sorted=False, batch_first=True)
             out, _ = one_layer(packed)
             unpacked, _ = nn.utils.rnn.pad_packed_sequence(out)
             padded_unpacked = self.repad(unpacked, s.size(0), s.size(1), 2 * s.size(2))
-            s = torch.cat((s, padded_unpacked), dim=2)
+            if self.shortcuts == 'all':
+                s = torch.cat((s, padded_unpacked), dim=2)
+            elif self.shortcuts == 'word':
+                s = torch.cat((words, padded_unpacked), dim=2)
+            # else (self.shortcuts == 'none') then apply no concatenation
         return padded_unpacked
 
     def repad(self, x, *org_sizes):
@@ -82,5 +89,14 @@ class SkipConnBiLSTM(nn.Module):
         padded = padded.transpose(0, 1)
         return padded
 
-    # def mlp(self, m):
-    #     for
+    def mlp(self, m):
+        # Activation after encoding and after each linear other than last one.
+        for one_layer in self.linears:
+            if self.activation == 'tanh':
+                m = F.tanh(m)
+            elif self.activation == 'relu':
+                m = F.relu(m)
+            else:
+                raise Exception('invalid activation function. Use "tanh" or "relu"')
+            m = one_layer(m)
+        return m
