@@ -44,9 +44,10 @@ RHS_max_sent_len = 70
 tokenize_reg = re.compile(r'[ ()]')
 
 null_string = '<NULL>'
-pad_string = '<PAD>'
+pad_string = '-'
 
-label_to_ix = {pad_string: 0, 'entailment': 1, 'neutral': 2, '-': 3, 'contradiction': 4}
+# ?????maybe pad-string should equal '-'????
+label_to_ix = {pad_string: 0, 'entailment': 1, 'neutral': 2, '-': 0, 'contradiction': 4}
 
 
 def get_preprocessed_data(embds_fname, out_fname, saved_embds=True, saved_data=True):
