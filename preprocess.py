@@ -46,8 +46,7 @@ tokenize_reg = re.compile(r'[ ()]')
 null_string = '<NULL>'
 pad_string = '-'
 
-# ?????maybe pad-string should equal '-'????
-label_to_ix = {pad_string: 0, 'entailment': 1, 'neutral': 2, '-': 0, 'contradiction': 4}
+label_to_ix = {pad_string: 0, 'entailment': 1, 'neutral': 2, 'contradiction': 3}
 
 
 def get_preprocessed_data(embds_fname, out_fname, saved_embds=True, saved_data=True):

@@ -1,7 +1,11 @@
-from model import SkipConnBiLSTM
-import preprocess
 import torch
 import torch.nn as nn
+import torch.optim as optim
+import math
+
+from model import SkipConnBiLSTM
+import preprocess
+
 # data:
 #     snli:
 #         train: tensor
@@ -13,24 +17,45 @@ import torch.nn as nn
 #         dev_mismatched: tensor
 # tensor_dim -> (num_examples, len_seq)
 
-def train(embds, data, word_to_ix, label_to_ix, **kwargs):
+def accuracy(model, loss_func, data):
+
+    s1, s2, lens1, lens2, labels = data
+
+    log_probs = model.forward(s1, s2, lens1, lens2)
+
+    loss = loss_func(log_probs, labels)
+    prediciton = torch.argmax(log_probs, dim=1)
+    acc = torch.sum(prediciton == labels).float() / float(len(labels))
+    return loss, acc
+
+def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
 
     # Read data into variables
     snli_train = data["snli"]["train"]
-    snli_dev = data["snli"]["dev"]
 
     multinli_train = data["multinli"]["train"]
     multinli_dev_matched = data["multinli"]["dev_matched"]
     multinli_dev_mismatched = data["multinli"]["dev_mismatched"]
 
+    # Upload all data to device
+    snli_train = tuple(map(lambda x: x.to(device), snli_train))
+
+    multinli_train = tuple(map(lambda x: x.to(device), multinli_train))
+    multinli_dev_matched = tuple(map(lambda x: x.to(device), multinli_dev_matched))
+    multinli_dev_mismatched = tuple(map(lambda x: x.to(device), multinli_dev_mismatched))
+
     batch_size = kwargs['batch_size']
     epochs = kwargs['epochs']
     ignore_index = label_to_ix[preprocess.pad_string]
+    lr = kwargs['lr']
+    lr_delta = kwargs['lr_delta']
+    epoch_drop_it = kwargs['epoch_drop_it']
 
-    snli_sample_size = torch.floor(snli_train[0].size(0) * 0.15)
+    snli_sample_size = math.floor(snli_train[0].size(0) * 0.15)
     num_of_examples = snli_sample_size + multinli_train[0].size(0)
 
     loss_function = nn.NLLLoss(ignore_index=ignore_index)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
 
     snli_rand_idx = torch.randperm(snli_train[0].size(0))
     snli_train_shuffled = tuple(map(lambda x: x[snli_rand_idx], snli_train))
@@ -40,22 +65,33 @@ def train(embds, data, word_to_ix, label_to_ix, **kwargs):
 
     for epoch in range(epochs):
 
-        snli_train_samples = tuple(map(lambda x: x[epoch * snli_train_samples:(epoch + 1) * snli_sample_size], snli_train_shuffled))
+        snli_train_samples = tuple(map(lambda x: x[epoch * snli_sample_size:(epoch + 1) * snli_sample_size], snli_train_shuffled))
         unified_train_samples = tuple(map(lambda x: torch.cat(x, dim=0), zip(snli_train_samples, multinli_train_shuffled)))
         for batch in range(0, num_of_examples, batch_size):
-            multinli_batch_samples = tuple(map(lambda x: x[batch:batch + batch_size], multinli_train))
+            s1, s2, lens1, lens2, labels = tuple(map(lambda x: x[batch:batch + batch_size], unified_train_samples))
 
+            log_probs = model.forward(s1, s2, lens1, lens2)
 
-    # Initialize linear layers
-    # ignore_index = label_to_ix[preprocess.pad_string]
-    # loss_function = nn.NLLLoss(ignore_index=ignore_index)
+            loss = loss_function(log_probs, labels)
+            loss.backward()
+            optimizer.step()
 
-    # Needs to be in train and lr should be dynamic
-    # lr = kwargs['lr']
-    # optimizer = optim.Adam(self.parameters(), lr=self.lr) ???how to used adam???
+        # If (epoch % epoch_drop_it) is 0 cut the lerning rate by lr_delta otherwise keep it the same.
+        lr = (epoch % epoch_drop_it == 0) * lr * lr_delta + (epoch % epoch_drop_it != 0) * lr
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
 
-    return
+        with torch.no_grad():
 
+            dev_matched_loss, dev_matched_acc = accuracy(model, loss_function, multinli_dev_matched)
+            dev_mismatched_loss, dev_mismatched_acc = accuracy(model, loss_function, multinli_dev_mismatched)
+
+            print("Epoch: {} |"
+                  " Dev Matched Loss: {} Dev Matched Acc: {} |"
+                  " Dev Mismatched Loss: {} Dev Mismatched Acc: {}"
+                  .format(epoch, dev_matched_loss, dev_matched_acc, dev_mismatched_loss, dev_mismatched_acc))
+
+    return model
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
@@ -66,24 +102,31 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--model-fname', help="Path to model file.", default="../data/model")
     parser.add_argument('-p', '--preprocess', help="Should load preprocessed data.", action='store_true')
     parser.add_argument('-f', '--fine-tune', help="Should fine tune the embeddings.", action='store_false')
-    parser.add_argument('-d', '--drop-out', help="Dropout between bilstm layers.", type=float, default=0.1)
+    parser.add_argument('-d', '--dropout', help="Dropout between bilstm layers.", type=float, default=0.1)
     parser.add_argument('-b', '--batch-size', help="Batch Size.", type=float, default=32)
     parser.add_argument('-e', '--epochs', help="Number of epochs.", type=float, default=100)
-    parser.add_argument('--lr', help="Learning Rate", type=float, default=0.0002)
-    parser.add_argument('-i', '--ignore_index', help="Learning Rate", type=float, default=0.0002)
-    parser.add_argument('-a', '--activation', help="Learning Rate", default='tanh')
-    parser.add_argument('-s', '--shortcuts', help="Learning Rate", default='all')
-    parser.add_argument('--h', help="BiLSTM hidden layers dimensions", nargs='+', type=int, default=[512])
-    parser.add_argument('--lin-h', help="Linear hidden layers dimensions", nargs='+', type=int, default=[1])
+    parser.add_argument('--epoch_drop_it', help="Number of epochs until lr decay.", type=int, default=2)
+    parser.add_argument('--lr', help="Learning Rate.", type=float, default=0.0002)
+    parser.add_argument('--lr-delta', help="Change rate in learning rate.", type=float, default=0.5)
+    parser.add_argument('-i', '--ignore_index', help="Label of '-'.", type=int, default=0)
+    parser.add_argument('-a', '--activation', help="Activation type ('tanh'/'relu').", default='tanh')
+    parser.add_argument('-s', '--shortcuts', help="Shortcuts state ('all'/'word'/'none').", default='all')
+    parser.add_argument('--h', help="BiLSTM hidden layers dimensions.", nargs='+', type=int, default=[512])
+    parser.add_argument('--lin-h', help="Linear hidden layers dimensions.", nargs='+', type=int, default=[1600])
     args = parser.parse_args()
     args = vars(args)   # Convert namespace to dictionary
 
     args['LHS_max_len'] = preprocess.LHS_max_sent_len
     args['RHS_max_len'] = preprocess.RHS_max_sent_len
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     embds, data, word_to_ix, label_to_ix = preprocess.get_preprocessed_data(args['embds_fname'], args['data_fname'],
                                                                             args['preprocess'], args['preprocess'])
 
-    train(embds, data, word_to_ix, label_to_ix, **args)
+    model = SkipConnBiLSTM(embds, (word_to_ix, label_to_ix), args['h'], args['lin_h'], args).to(device)
 
-    print(args)
+    trained_model = train(model, embds, data, word_to_ix, label_to_ix, device, **args)
+
+    torch.save(trained_model, 'trained_model')
+
+    print('DONE')
