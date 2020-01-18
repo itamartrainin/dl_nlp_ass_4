@@ -27,7 +27,7 @@ def accuracy(model, loss_func, data):
     loss = loss_func(log_probs, labels)
     prediciton = torch.argmax(log_probs, dim=1)
     acc = torch.sum(prediciton == labels).float() / float(len(labels))
-    return loss, acc
+    return loss, acc * 100
 
 def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
 
@@ -71,7 +71,7 @@ def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
         snli_train_samples = tuple(map(lambda x: x[epoch * snli_sample_size:(epoch + 1) * snli_sample_size], snli_train_shuffled))
         unified_train_samples = tuple(map(lambda x: torch.cat(x, dim=0), zip(snli_train_samples, multinli_train_shuffled)))
         avg_train_loss_batches, avg_train_acc_batches = 0, 0
-        for batch in range(0, num_of_examples, batch_size):
+        for batch in range(0, unified_train_samples[0].shape[0], batch_size):
             if batch < num_of_examples - batch_size:
                 s1, s2, lens1, lens2, labels = tuple(map(lambda x: x[batch:batch + batch_size], unified_train_samples))
             else:
@@ -88,7 +88,6 @@ def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
 
         train_loss_arr.append(avg_train_loss_batches)
         train_acc_arr.append(avg_train_acc_batches)
-
         # If (epoch % epoch_drop_it) is 0 cut the lerning rate by lr_delta otherwise keep it the same.
         lr = (epoch % epoch_drop_it == 0) * lr * lr_delta + (epoch % epoch_drop_it != 0) * lr
         for param_group in optimizer.param_groups:
@@ -121,7 +120,7 @@ def learning_plots(learning_info):
         plt.figure()
         plt.plot(learning_info[key])
         plt.title(key)
-        plt.xlabel = "Epochs"
+        plt.xlabel("Epochs")
         plt.savefig("{}.jpeg".format(key))
 
 
@@ -141,7 +140,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', help="Learning Rate.", type=float, default=0.0002)
     parser.add_argument('--lr-delta', help="Change rate in learning rate.", type=float, default=0.5)
     parser.add_argument('-i', '--ignore_index', help="Label of '-'.", type=int, default=0)
-    parser.add_argument('-a', '--activation', help="Activation type ('tanh'/'relu').", default='tanh')
+    parser.add_argument('-a', '--activation', help="Activation type ('tanh'/'relu').", default='relu')
     parser.add_argument('-s', '--shortcuts', help="Shortcuts state ('all'/'word'/'none').", default='all')
     parser.add_argument('--h', help="BiLSTM hidden layers dimensions.", nargs='+', type=int, default=[512])
     parser.add_argument('--lin-h', help="Linear hidden layers dimensions.", nargs='+', type=int, default=[1600])
@@ -158,7 +157,7 @@ if __name__ == '__main__':
     model = SkipConnBiLSTM(embds, (word_to_ix, label_to_ix), args['h'], args['lin_h'], args).to(device)
 
     trained_model, learning_info = train(model, embds, data, word_to_ix, label_to_ix, device, **args)
-
+    learning_plots(learning_info)
     torch.save([trained_model, learning_info], 'model_experiment')
 
     print('DONE')

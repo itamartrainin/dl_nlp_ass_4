@@ -60,7 +60,7 @@ class SkipConnBiLSTM(nn.Module):
 
         self.linear_reduce = nn.Linear(lin_h[-1], len(self.label_to_ix))
 
-        self.softmax = nn.Softmax()
+        self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, s1, s2, lens1, lens2):
         # Embedding layer
@@ -97,12 +97,11 @@ class SkipConnBiLSTM(nn.Module):
 
         batch_size = s.size(0)
         absolute_max_seq_len = s.size(1)
-
         s = s[:, :max(lens)]
         words = s.clone()
         for i in range(len(self.bilstms)):
             one_layer = self.bilstms[i]
-            packed = nn.utils.rnn.pack_padded_sequence(s, lens.cpu().numpy(), enforce_sorted=False, batch_first=True)
+            packed = nn.utils.rnn.pack_padded_sequence(s, lens, enforce_sorted=False, batch_first=True)
             out, _ = one_layer(packed)
             unpacked, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True)
 
@@ -115,9 +114,9 @@ class SkipConnBiLSTM(nn.Module):
             else:
                 s = unpacked
 
-        padded = torch.zeros(batch_size, absolute_max_seq_len, s.size(2))
+        padded = torch.zeros(batch_size, s.size(1), s.size(2))
         padded[:, :s.size(1)] = s
-
+        del words
         return padded
 
     def mlp(self, m):

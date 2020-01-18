@@ -36,7 +36,7 @@ data_prop = {
 
 embds_data_path = '../data/glove.840B.300d/glove.840B.300d.txt'
 embds_dim = 300
-vocab_size= 2196017
+vocab_size = 2196017
 
 LHS_max_sent_len = 401
 RHS_max_sent_len = 70
