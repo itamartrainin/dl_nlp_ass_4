@@ -27,7 +27,7 @@ def accuracy(model, loss_func, data):
     loss = loss_func(log_probs, labels)
     prediciton = torch.argmax(log_probs, dim=1)
     acc = torch.sum(prediciton == labels).float() / float(len(labels))
-    return loss, acc * 100
+    return loss.item(), acc * 100
 
 def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
 
@@ -39,11 +39,11 @@ def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
     multinli_dev_mismatched = data["multinli"]["dev_mismatched"]
 
     # Upload all data to device
-    snli_train = tuple(map(lambda x: x.to(device), snli_train))
+    # snli_train = tuple(map(lambda x: x.to(device), snli_train))
 
-    multinli_train = tuple(map(lambda x: x.to(device), multinli_train))
-    multinli_dev_matched = tuple(map(lambda x: x.to(device), multinli_dev_matched))
-    multinli_dev_mismatched = tuple(map(lambda x: x.to(device), multinli_dev_mismatched))
+    # multinli_train = tuple(map(lambda x: x.to(device), multinli_train))
+    # multinli_dev_matched = tuple(map(lambda x: x.to(device), multinli_dev_matched))
+    # multinli_dev_mismatched = tuple(map(lambda x: x.to(device), multinli_dev_mismatched))
 
     batch_size = kwargs['batch_size']
     epochs = kwargs['epochs']
@@ -73,16 +73,16 @@ def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
         avg_train_loss_batches, avg_train_acc_batches = 0, 0
         for batch in range(0, unified_train_samples[0].shape[0], batch_size):
             if batch < num_of_examples - batch_size:
-                s1, s2, lens1, lens2, labels = tuple(map(lambda x: x[batch:batch + batch_size], unified_train_samples))
+                s1, s2, lens1, lens2, labels = tuple(map(lambda x: x[batch:batch + batch_size].to(device), unified_train_samples))
             else:
-                s1, s2, lens1, lens2, labels = tuple(map(lambda x: x[batch:], unified_train_samples))
+                s1, s2, lens1, lens2, labels = tuple(map(lambda x: x[batch:].to(device), unified_train_samples))
             log_probs = model.forward(s1, s2, lens1, lens2)
 
             loss = loss_function(log_probs, labels)
             loss.backward()
             optimizer.step()
 
-            avg_train_loss_batches += loss * (len(labels) / num_of_examples)
+            avg_train_loss_batches += loss.item() * (len(labels) / num_of_examples)
             prediciton = torch.argmax(log_probs, dim=1)
             avg_train_acc_batches += (torch.sum(prediciton == labels).float() / float(len(labels))) * (len(labels) / num_of_examples) * 100
 
@@ -142,8 +142,8 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--ignore_index', help="Label of '-'.", type=int, default=0)
     parser.add_argument('-a', '--activation', help="Activation type ('tanh'/'relu').", default='relu')
     parser.add_argument('-s', '--shortcuts', help="Shortcuts state ('all'/'word'/'none').", default='all')
-    parser.add_argument('--h', help="BiLSTM hidden layers dimensions.", nargs='+', type=int, default=[512])
-    parser.add_argument('--lin-h', help="Linear hidden layers dimensions.", nargs='+', type=int, default=[1600])
+    parser.add_argument('--h', help="BiLSTM hidden layers dimensions.", nargs='+', type=int, default=[350])
+    parser.add_argument('--lin-h', help="Linear hidden layers dimensions.", nargs='+', type=int, default=[400])
     args = parser.parse_args()
     args = vars(args)   # Convert namespace to dictionary
 
@@ -153,6 +153,8 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     embds, data, word_to_ix, label_to_ix = preprocess.get_preprocessed_data(args['embds_fname'], args['data_fname'],
                                                                             args['preprocess'], args['preprocess'])
+    # embds, data, word_to_ix, label_to_ix = preprocess.get_preprocessed_data(args['embds_fname'], args['data_fname'],
+    #                                                                         args['preprocess'], False)
 
     model = SkipConnBiLSTM(embds, (word_to_ix, label_to_ix), args['h'], args['lin_h'], args).to(device)
 
