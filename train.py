@@ -71,6 +71,7 @@ def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
         snli_train_samples = tuple(map(lambda x: x[epoch * snli_sample_size:(epoch + 1) * snli_sample_size], snli_train_shuffled))
         unified_train_samples = tuple(map(lambda x: torch.cat(x, dim=0), zip(snli_train_samples, multinli_train_shuffled)))
         avg_train_loss_batches, avg_train_acc_batches = 0, 0
+        num_of_examples = unified_train_samples[0].shape[0]
         for batch in range(0, unified_train_samples[0].shape[0], batch_size):
             if batch < num_of_examples - batch_size:
                 s1, s2, lens1, lens2, labels = tuple(map(lambda x: x[batch:batch + batch_size].to(device), unified_train_samples))
