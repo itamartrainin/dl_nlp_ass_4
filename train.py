@@ -31,6 +31,7 @@ def accuracy(model, loss_func, data):
 
 def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
 
+    model = model.to(device)
     # Read data into variables
     snli_train = data["snli"]["train"]
 
@@ -72,7 +73,7 @@ def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
         unified_train_samples = tuple(map(lambda x: torch.cat(x, dim=0), zip(snli_train_samples, multinli_train_shuffled)))
         avg_train_loss_batches, avg_train_acc_batches = 0, 0
         num_of_examples = unified_train_samples[0].shape[0]
-        for batch in range(0, unified_train_samples[0].shape[0], batch_size):
+        for batch in range(0, num_of_examples, batch_size):
             if batch < num_of_examples - batch_size:
                 s1, s2, lens1, lens2, labels = tuple(map(lambda x: x[batch:batch + batch_size].to(device), unified_train_samples))
             else:
@@ -95,7 +96,8 @@ def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
             param_group['lr'] = lr
 
         with torch.no_grad():
-
+            multinli_dev_matched = tuple(map(lambda x: x.to(device), multinli_dev_matched))
+            multinli_dev_mismatched = tuple(map(lambda x: x.to(device), multinli_dev_mismatched))
             dev_matched_loss, dev_matched_acc = accuracy(model, loss_function, multinli_dev_matched)
             dev_mismatched_loss, dev_mismatched_acc = accuracy(model, loss_function, multinli_dev_mismatched)
             dev_matched_loss_arr.append(dev_matched_loss)
@@ -103,9 +105,10 @@ def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
             dev_mismatched_loss_arr.append(dev_mismatched_loss)
             dev_mismatched_acc_arr.append(dev_mismatched_acc)
             print("Epoch: {} |"
+                  " Train Loss: {} Train Acc: {} |"
                   " Dev Matched Loss: {} Dev Matched Acc: {} |"
                   " Dev Mismatched Loss: {} Dev Mismatched Acc: {}"
-                  .format(epoch, dev_matched_loss, dev_matched_acc, dev_mismatched_loss, dev_mismatched_acc))
+                  .format(epoch, avg_train_loss_batches, avg_train_acc_batches, dev_matched_loss, dev_matched_acc, dev_mismatched_loss, dev_mismatched_acc))
 
     learning_info = {"train loss": train_loss_arr,
                        "train acc": train_acc_arr,
@@ -138,13 +141,13 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--batch-size', help="Batch Size.", type=float, default=32)
     parser.add_argument('-e', '--epochs', help="Number of epochs.", type=float, default=100)
     parser.add_argument('--epoch_drop_it', help="Number of epochs until lr decay.", type=int, default=2)
-    parser.add_argument('--lr', help="Learning Rate.", type=float, default=0.0002)
+    parser.add_argument('--lr', help="Learning Rate.", type=float, default=0.2)
     parser.add_argument('--lr-delta', help="Change rate in learning rate.", type=float, default=0.5)
     parser.add_argument('-i', '--ignore_index', help="Label of '-'.", type=int, default=0)
     parser.add_argument('-a', '--activation', help="Activation type ('tanh'/'relu').", default='relu')
     parser.add_argument('-s', '--shortcuts', help="Shortcuts state ('all'/'word'/'none').", default='all')
-    parser.add_argument('--h', help="BiLSTM hidden layers dimensions.", nargs='+', type=int, default=[350])
-    parser.add_argument('--lin-h', help="Linear hidden layers dimensions.", nargs='+', type=int, default=[400])
+    parser.add_argument('--h', help="BiLSTM hidden layers dimensions.", nargs='+', type=int, default=[512, 512])
+    parser.add_argument('--lin-h', help="Linear hidden layers dimensions.", nargs='+', type=int, default=[1600])
     args = parser.parse_args()
     args = vars(args)   # Convert namespace to dictionary
 
@@ -152,15 +155,20 @@ if __name__ == '__main__':
     args['RHS_max_len'] = preprocess.RHS_max_sent_len
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    embds, data, word_to_ix, label_to_ix = preprocess.get_preprocessed_data(args['embds_fname'], args['data_fname'],
-                                                                            args['preprocess'], args['preprocess'])
-    # embds, data, word_to_ix, label_to_ix = preprocess.get_preprocessed_data(args['embds_fname'], args['data_fname'],
-    #                                                                         args['preprocess'], False)
+    print(torch.cuda.memory_cached())
+    torch.cuda.empty_cache()
+    print(torch.cuda.memory_cached())
 
-    model = SkipConnBiLSTM(embds, (word_to_ix, label_to_ix), args['h'], args['lin_h'], args).to(device)
+    # embds, data, word_to_ix, label_to_ix = preprocess.get_preprocessed_data(args['embds_fname'], args['data_fname'],
+    #                                                                         args['preprocess'], args['preprocess'])
+    embds, data, word_to_ix, label_to_ix = preprocess.get_preprocessed_data(args['embds_fname'], args['data_fname'],
+                                                                            True, True)
+
+    model = SkipConnBiLSTM(device, embds, (word_to_ix, label_to_ix), args['h'], args['lin_h'], args)
+
 
     trained_model, learning_info = train(model, embds, data, word_to_ix, label_to_ix, device, **args)
-    learning_plots(learning_info)
     torch.save([trained_model, learning_info], 'model_experiment')
+    learning_plots(learning_info)
 
     print('DONE')
