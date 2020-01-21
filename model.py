@@ -48,7 +48,7 @@ class SkipConnBiLSTM(nn.Module):
                                             batch_first=True).to(device))
 
         # Dropout layer
-        self.dropout_layer = nn.Dropout(self.dropout).to(device)
+        self.dropout_layer = nn.Dropout(self.dropout)
 
         # 2 (for bi-directional) * 4 (for entailment layer) * h[-1] (for lstm output layer dim)
         first_hidden_layer_dim = 2 * 4 * h[-1]
@@ -58,14 +58,14 @@ class SkipConnBiLSTM(nn.Module):
         for i in range(self.num_lin_layers):
             self.linears.append(nn.Linear((i == 0) * (first_hidden_layer_dim) + (i != 0) * lin_h[i-1], lin_h[i]).to(device))
 
-        self.linear_reduce = nn.Linear(lin_h[-1], len(self.label_to_ix)).to(device)
+        self.linear_reduce = nn.Linear(lin_h[-1], len(self.label_to_ix))
 
-        self.softmax = nn.LogSoftmax(dim=1).to(device)
+        self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, s1, s2, lens1, lens2):
         # Embedding layer
-        s1 = self.E(s1.to(self.device))
-        s2 = self.E(s2.to(self.device))
+        s1 = self.E(s1)
+        s2 = self.E(s2)
 
         # Encoding layer
         s1 = self.encode(s1, lens1)
@@ -101,7 +101,7 @@ class SkipConnBiLSTM(nn.Module):
         words = s.clone()
         for i in range(len(self.bilstms)):
             one_layer = self.bilstms[i].to(self.device)
-            packed = nn.utils.rnn.pack_padded_sequence(s, lens, enforce_sorted=False, batch_first=True).to(self.device)
+            packed = nn.utils.rnn.pack_padded_sequence(s, lens, enforce_sorted=False, batch_first=True)
             out, _ = one_layer(packed)
             unpacked, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True)
 
