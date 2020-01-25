@@ -89,6 +89,8 @@ def train(model, embds, data, word_to_ix, label_to_ix, device, **kwargs):
 
             avg_train_loss_batches += loss.item() * (len(labels) / num_of_examples)
             prediciton = torch.argmax(log_probs, dim=1)
+            # if 0 in prediciton and batch != 0:
+            #     raise Exception("noooo")
             avg_train_acc_batches += (torch.sum(prediciton == labels).float() / float(len(labels))) * (len(labels) / num_of_examples) * 100
             # print("{} : {}".format(batch, avg_train_acc_batches))
         train_loss_arr.append(avg_train_loss_batches)
@@ -145,15 +147,15 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--fine-tune', help="Should fine tune the embeddings.", action='store_false')
     parser.add_argument('-d', '--dropout', help="Dropout between bilstm layers.", type=float, default=0.1)
     parser.add_argument('-b', '--batch-size', help="Batch Size.", type=float, default=32)
-    parser.add_argument('-e', '--epochs', help="Number of epochs.", type=float, default=5000)
+    parser.add_argument('-e', '--epochs', help="Number of epochs.", type=float, default=25)
     parser.add_argument('--epoch_drop_it', help="Number of epochs until lr decay.", type=int, default=2)
-    parser.add_argument('--lr', help="Learning Rate.", type=float, default=0.0002)
+    parser.add_argument('--lr', help="Learning Rate.", type=float, default=0.002)
     parser.add_argument('--lr-delta', help="Change rate in learning rate.", type=float, default=0.5)
     parser.add_argument('-i', '--ignore_index', help="Label of '-'.", type=int, default=0)
     parser.add_argument('-a', '--activation', help="Activation type ('tanh'/'relu').", default='relu')
     parser.add_argument('-s', '--shortcuts', help="Shortcuts state ('all'/'word'/'none').", default='all')
-    parser.add_argument('--h', help="BiLSTM hidden layers dimensions.", nargs='+', type=int, default=[512, 1024])
-    parser.add_argument('--lin-h', help="Linear hidden layers dimensions.", nargs='+', type=int, default=[1600, 200])
+    parser.add_argument('--h', help="BiLSTM hidden layers dimensions.", nargs='+', type=int, default=[512, 1024, 2048])
+    parser.add_argument('--lin-h', help="Linear hidden layers dimensions.", nargs='+', type=int, default=[1600])
     args = parser.parse_args()
     args = vars(args)   # Convert namespace to dictionary
 

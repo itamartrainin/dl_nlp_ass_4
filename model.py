@@ -114,10 +114,10 @@ class SkipConnBiLSTM(nn.Module):
             else:
                 s = unpacked
 
-        padded = torch.zeros(batch_size, s.size(1), s.size(2))
-        padded[:, :s.size(1)] = s
+        # padded = torch.zeros(batch_size, s.size(1), s.size(2))
+        # padded[:, :s.size(1)] = s
         del words
-        return padded
+        return s
 
     def mlp(self, m):
         m = m.to(self.device)
